@@ -43,6 +43,7 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.DngCreator;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.ExifInterface;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaScannerConnection;
@@ -504,7 +505,7 @@ public class Camera2RawFragment extends Fragment
         }
 
     };
-
+    private static final String IMG_FORMAT = "'IMG'_yyyyMMdd_HHmmss";
     /**
      * A {@link CameraCaptureSession.CaptureCallback} that handles the still JPEG and RAW capture
      * request.
@@ -514,13 +515,13 @@ public class Camera2RawFragment extends Fragment
         @Override
         public void onCaptureStarted(CameraCaptureSession session, CaptureRequest request,
                                      long timestamp, long frameNumber) {
-            String currentDateTime = generateTimestamp();
+            String fileName = generateTimestamp();
             File rawFile = new File(Environment.
                     getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
-                    "RAW_" + currentDateTime + ".dng");
+                    fileName + ".dng");
             File jpegFile = new File(Environment.
                     getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
-                    "JPEG_" + currentDateTime + ".jpg");
+                    fileName + ".jpg");
 
             // Look up the ImageSaverBuilder for this request and update it with the file name
             // based on the capture start time.
@@ -723,10 +724,11 @@ public class Camera2RawFragment extends Fragment
                         Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea());
 
-//                Size largestRaw = Collections.max(
-//                        Arrays.asList(map.getOutputSizes(ImageFormat.RAW_SENSOR)),
-//                        new CompareSizesByArea());
-                Size largestRaw = new Size(4208, 3120);//9051
+                Size largestRaw = Collections.max(
+                        Arrays.asList(map.getOutputSizes(ImageFormat.RAW_SENSOR)),
+                        new CompareSizesByArea());
+                Log.d("WAY", "largestRaw = " + largestRaw);
+                //largestRaw = new Size(4208, 3120);//9051
 
                 synchronized (mCameraStateLock) {
                     // Set up ImageReaders for JPEG and RAW outputs.  Place these in a reference
@@ -1364,7 +1366,19 @@ public class Camera2RawFragment extends Fragment
             mContext = context;
             mReader = reader;
         }
-
+        private int getDngOrientation(int imageOrientation) {
+            int orientation = ExifInterface.ORIENTATION_NORMAL;
+            if (imageOrientation == 0) {
+                orientation = ExifInterface.ORIENTATION_NORMAL;
+            } else if (imageOrientation == 90) {
+                orientation = ExifInterface.ORIENTATION_ROTATE_90;
+            } else if (imageOrientation == 180) {
+                orientation = ExifInterface.ORIENTATION_ROTATE_180;
+            } else {
+                orientation = ExifInterface.ORIENTATION_ROTATE_270;
+            }
+            return orientation;
+        }
         @Override
         public void run() {
             boolean success = false;
@@ -1392,6 +1406,7 @@ public class Camera2RawFragment extends Fragment
                     FileOutputStream output = null;
                     try {
                         output = new FileOutputStream(mFile);
+                        dngCreator.setOrientation(getDngOrientation(90));
                         dngCreator.writeImage(output, mImage);
                         success = true;
                     } catch (IOException e) {
@@ -1670,7 +1685,7 @@ public class Camera2RawFragment extends Fragment
      * @return a {@link String} representing a time.
      */
     private static String generateTimestamp() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss_SSS", Locale.US);
+        SimpleDateFormat sdf = new SimpleDateFormat(IMG_FORMAT, Locale.US);
         return sdf.format(new Date());
     }
 
